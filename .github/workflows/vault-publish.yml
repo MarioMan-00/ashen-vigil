@@ -1,0 +1,54 @@
+# Publish this game to the Playtest Vault on every merge into main. Copy this file to .github/workflows/vault-publish.yml
+# (that exact path: the vault only accepts publishes from it) and integrations/github/vault-publish.mjs (from
+# DD1000/playtest-vault) to tools/vault-publish.mjs. The studio lead connects the repo to its game once
+# (`node scripts/vault.mts publish-repo <game> <owner/repo> --prod`); no secret goes in the repo: GitHub tells the vault
+# which repo and branch each run comes from. Then run this workflow by hand with "Only check" ticked to see it's
+# connected.
+#
+# The pull request's title is the patch note, "Resolves: <note ids>" in it marks those tester notes done, and everyone
+# who can play the game is alerted. "[skip publish]" in a commit, or a pull request title starting with "WIP:", doesn't
+# publish. The vault picks the version (its newest web build + 1).
+name: Publish to the Playtest Vault
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      check:
+        description: Only check this repo is connected to the vault (publishes nothing)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  # GitHub's sign-in for the vault (proves this run is this repo's main branch).
+  id-token: write
+
+concurrency:
+  group: vault-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build and publish
+        run: node tools/vault-publish.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VAULT_CHECK: ${{ inputs.check && '1' || '' }}
+          # The folder testers get (it must have index.html at the top). Only the game's own files: no tests or tools.
+          VAULT_DIST: web
+          # Optional: a command that builds VAULT_DIST first, e.g. npm ci && npm run build.
+          # VAULT_BUILD:
+          # Optional: a command that writes the version ({version}) into the game.
+          # VAULT_STAMP:
+          # The game's splash art becomes its cover in the vault (its page, cards, Heartwave's launch screen) whenever
+          # it changes: splash.png, .jpg or .webp at the top of the repo, or another file here.
+          # VAULT_SPLASH: art/splash.png
