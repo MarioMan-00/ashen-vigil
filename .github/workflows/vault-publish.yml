@@ -39,7 +39,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Build and publish
-        run: node tools/vault-publish.mjs
+        # Any ✖ error is also raised as an annotation, so it shows on the run page without opening the logs.
+        run: |
+          node tools/vault-publish.mjs 2> >(tee vault-error.txt >&2) || { echo "::error title=Playtest Vault::$(tr '\n' ' ' < vault-error.txt)"; exit 1; }
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
           VAULT_CHECK: ${{ inputs.check && '1' || '' }}
